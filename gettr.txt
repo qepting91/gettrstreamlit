@@ -1,0 +1,211 @@
+"""Tests for the 'all' capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_all_posts():
+    """Verifies we can extract the first five posts."""
+    posts = list(client.all(max=5))
+    assert len(posts) == 5
+
+
+def test_user_posts_downward():
+    """Verifies that we can pull posts backward."""
+    posts = list(client.all(last="pew9", max=10, order="down"))
+    assert len(posts) == 10
+
+
+def test_user_posts_limited_id():
+    """Verifies that we can pull posts backward with an ID as the endpoint."""
+    posts = list(client.all(last="pew9", first="pew0", order="down"))
+    assert len(posts) > 0
+
+
+def test_all_comments():
+    """Verifies we can extract the first five comments."""
+    comments = list(client.all(max=5, type="comments"))
+    assert len(comments) == 5
+"""Tests for the 'comments' (from post) capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+POST_NO_COMMENTS = "p2zkgu"
+POST_TWO_COMMENTS = "p2zp65"
+
+
+def test_comments_from_post():
+    """Verifies we can get comments from a post."""
+    resp = list(client.comments(post_id="p2vhax", max=50))
+    assert len(resp) == 50
+
+
+def test_comments_from_post_no_comments():
+    """Verifies we can get comments from a post with no comments."""
+    resp = list(client.comments(post_id=POST_NO_COMMENTS, max=3))
+    assert len(resp) == 0
+
+
+def test_comments_from_post_two_comments():
+    """Verifies we can get comments from a post with only two comments."""
+    resp = list(client.comments(post_id=POST_TWO_COMMENTS, max=3))
+    assert len(resp) == 2
+"""Tests for the 'hashtag' capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_suggested_hashtags():
+    """Verifies we can extract suggested hashtags."""
+    resp = list(client.hashtags(max=10))
+    assert len(resp) >= 5 and len(resp) <= 10  # seems to fluctuate
+
+    # Later results (e.g., past #5) won't have expanded info
+    assert "hashtag" in resp[0]
+    assert ("description" in resp[0]) or ("score" in resp[0])
+"""Tests for the 'search' capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_basic_search():
+    """Verifies we can perform a basic search."""
+    posts = list(client.search(query="stanford", max=200))
+    assert len(posts) > 50  # GETTR's number of search results is inconsistent
+
+    for post in posts:
+        assert "stanford" in post["txt"].lower()
+
+        # Check whether user info is present
+        assert "ousername" in post["uinf"]
+
+
+def test_paginated_search():
+    """Verifies we can perform a paginated search."""
+    posts = list(client.search(query="x", max=500))
+    assert len(posts) > 50  # GETTR's number of search results is inconsistent
+
+"""Tests for the 'suggested' capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_suggested():
+    """Verifies we can extract suggested users."""
+    resp = list(client.suggested(max=50))
+    assert len(resp) == 50
+    assert "nickname" in resp[0]  # Verify that it is actual user data
+    assert "dsc" in resp[0]
+"""Tests for the 'trends' capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_trends():
+    """Verifies we can extract trending posts."""
+    # resp = list(client.trends(max=5))
+    # assert len(resp) > 0
+    # TODO(milesmcc): reactivate this test when GETTR puts posts back on its homepage
+"""Tests for the 'user'/'user-activity' capability."""
+
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_user_posts():
+    """Verifies we can extract posts for a simple, known user."""
+    posts = list(client.user_activity(username="support", max=5, type="posts"))
+    assert len(posts) > 0
+
+
+def test_user_posts_max():
+    """Verifies that we pull at most `max` posts."""
+    posts = list(client.user_activity(username="dailynews", max=21, type="posts"))
+    assert len(posts) == 21
+
+
+def test_user_comments():
+    """Verifies we can extract comments for a simple, known user."""
+    comments = list(
+        client.user_activity(username="dineshdsouza", max=5, type="comments")
+    )
+    assert len(comments) > 0
+
+
+def test_user_likes():
+    """Verifies we can extract comments for a simple, known user."""
+    comments = list(
+        client.user_activity(username="emeraldrobinson", max=10, type="likes")
+    )
+    assert len(comments) == 10
+
+
+def test_user_pagination():
+    """Verifies we can extract paginated activity for a simple, known user."""
+    activity = list(
+        client.user_activity(username="dineshdsouza", max=40, type="comments")
+    )
+    assert len(activity) == 40
+
+"""Tests for the 'user-info' capability."""
+
+from gogettr import PublicClient
+from gogettr.errors import GettrApiError
+
+client = PublicClient()
+
+
+def test_user_info():
+    """Verifies we can extract user info for a simple, known user."""
+    resp = client.user_info(username="support")
+    print(resp)
+    assert resp["nickname"] == "Support & Help"
+    assert resp["username"] == "support"
+    assert resp["ousername"] == "support"
+    assert resp["infl"] == "4"
+
+
+def test_user_info_nonexistent():
+    """Verifies that we safely can pull the user info of a nonexistent user."""
+    try:
+        client.user_info(
+            username="fsjdhflqkdsjfhlaskfjdhlaksdhluweh"
+        )  # If someone registers this name, just change the test
+        assert False  # This should error
+    except GettrApiError as err:
+        assert err.issue["error"]["code"] == "E_USER_NOTFOUND"
+"""Tests for the 'user_relationships' (following/followers) capability."""
+
+from gogettr import PublicClient
+
+client = PublicClient()
+
+
+def test_user_following():
+    """Verifies we can extract who a user is following."""
+    resp = list(
+        client.user_relationships(username="etaoinshrdlu", type="following", max=50)
+    )
+    assert "JasonMillerinDC" in [user["ousername"] for user in resp]
+
+
+def test_user_followers():
+    """Verifies we can extract a user's followers."""
+    resp = list(
+        client.user_relationships(username="dineshdsouza", type="followers", max=501)
+    )
+    assert len(resp) == 501
