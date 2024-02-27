@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from gogettr import PublicClient, errors
+from gogettr import PublicClient
+from gogettr.errors import GettrApiError
 import networkx as nx
 import matplotlib.pyplot as plt
 from textblob import TextBlob
@@ -8,10 +9,6 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import bokeh.plotting as bp
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-from bokeh.models import HoverTool, ColumnDataSource
-from bokeh.plotting import figure, show
-from bokeh.transform import linear_cmap
-from bokeh.palettes import Spectral4
 from requests.exceptions import JSONDecodeError
 
 # Initialize the gogettr client
@@ -42,40 +39,65 @@ def display_posts_by_keyword(keyword, max_results=100):
     except Exception as e:
         st.error(f"Error fetching posts by keyword: {str(e)}")
 
-def display_user_activity(username, activity_type="posts", max_results=100):
+def display_user_posts(username, max_results=100):
     try:
-        if activity_type in ["posts", "comments", "likes"]:
-            activities = list(client.user_activity(username=username, max=max_results, type=activity_type))
-            if activities:
-                df = pd.DataFrame(activities)
-                st.dataframe(df)
-            else:
-                st.error(f"No {activity_type} found for this user.")
+        posts = list(client.user_activity(username=username, max=max_results, type="posts"))
+        if posts:
+            df = pd.DataFrame(posts)
+            st.dataframe(df) 
+            # ... add pagination if needed
         else:
-            st.error("Invalid activity type specified.")
-    except errors.GettrApiError as e:
-        st.error(f"Failed to fetch user {activity_type}: {str(e)}")
-
-def visualize_user_network(username):
+            st.error("No posts found for this user.")
+    except GettrApiError as e:
+        st.error(f"Failed to fetch user posts: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+        
+def display_user_comments(username, max_results=100):
     try:
-        followers = list(client.user_relationships(username=username, type="followers", max=100))
-        following = list(client.user_relationships(username=username, type="following", max=100))
-        
-        G = nx.DiGraph()
-        G.add_node(username, role='central')
-        for follower in followers:
-            G.add_node(follower['ousername'], role='follower')
-            G.add_edge(follower['ousername'], username)
-        for followee in following:
-            G.add_node(followee['ousername'], role='following')
-            G.add_edge(username, followee['ousername'])
-        
-        pos = nx.spring_layout(G)
-        nx.draw(G, pos, with_labels=True, node_size=2500, node_color="lightblue", font_size=10, font_weight="bold")
-        plt.title(f"Network of {username}: Followers and Following")
-        st.pyplot(plt)
-    except errors.GettrApiError as e:
-        st.error(f"Failed to visualize user network: {str(e)}")
+        comments = list(client.user_activity(username=username, max=max_results, type="comments"))
+        if comments:
+            df = pd.DataFrame(comments)
+            st.dataframe(df) 
+            # ... add pagination if needed
+        else:
+            st.error("No comments found for this user.")
+    except GettrApiError as e:
+        st.error(f"Failed to fetch user comments: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+
+def display_user_likes(username, max_results=100):
+    try:
+        likes = list(client.user_activity(username=username, max=max_results, type="likes"))
+        if likes:
+            df = pd.DataFrame(likes)
+            st.dataframe(df) 
+            # ... add pagination if needed
+        else:
+            st.error("No likes found for this user.")
+    except GettrApiError as e:
+        st.error(f"Failed to fetch user likes: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+
+def get_user_followers(username, max_results=100):
+    try:
+        followers = list(client.user_relationships(username=username, type="followers", max=max_results))
+        return pd.DataFrame(followers)
+    except GettrApiError as e:
+        st.error(f"Failed to fetch user followers: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+
+def get_user_following(username, max_results=100):
+    try:
+        following = list(client.user_relationships(username=username, type="following", max=max_results))
+        return pd.DataFrame(following)
+    except GettrApiError as e:
+        st.error(f"Failed to fetch users the user is following: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
 
 # --- Functions for Analysis ---
 
@@ -92,56 +114,6 @@ def display_posts_with_sentiment(keyword, max_results=100):
     except Exception as e:
         st.error(f"Failed to analyze sentiment: {str(e)}")
 
-
-def visualize_network_interactively(username):
-    try:
-        # Fetch data
-        followers = list(client.user_relationships(username=username, type="followers", max=100))
-        following = list(client.user_relationships(username=username, type="following", max=100))
-        
-        # Assuming the usage of NetworkX to create and manipulate the network graph
-        G = nx.DiGraph()
-        # Add nodes and edges as previously shown
-        
-        # Convert the graph into a format compatible with Bokeh for visualization
-        # This involves creating data sources for nodes and edges, setting up the figure, and adding glyphs
-        
-        plot = figure(title=f"Interactive Network of {username}", x_range=(-1.1,1.1), y_range=(-1.1,1.1))
-        
-        # Add hover tool
-        hover = HoverTool(tooltips=[("Username", "@username"), ("Role", "@role")])
-        plot.add_tools(hover)
-        
-        # Add network graph rendering here
-        # Example: plot.line('x0', 'y0', 'x1', 'y1', source=edge_source, line_width=1, color="navy")
-        
-        st.bokeh_chart(plot)
-        
-    except Exception as e:
-        st.error(f"Failed to visualize network interactively: {str(e)}")
-
-def perform_topic_modeling(keyword, num_topics=5):
-    try:
-        posts = list(client.search(query=keyword, max=100))
-        texts = [post['text'] for post in posts if 'text' in post]
-
-        # Preprocess texts if necessary (e.g., removing stopwords, tokenization)
-        
-        # Vectorize the text data
-        vectorizer = CountVectorizer(max_df=0.95, min_df=2, stop_words='english')
-        dtm = vectorizer.fit_transform(texts)
-        
-        # Fit the LDA model
-        lda_model = LatentDirichletAllocation(n_components=num_topics, random_state=0)
-        lda_model.fit(dtm)
-        
-        # Display topics
-        for index, topic in enumerate(lda_model.components_):
-            st.write(f"Topic #{index}")
-            st.write([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-10:]])
-            
-    except Exception as e:
-        st.error(f"Failed to perform topic modeling: {str(e)}")
 # --- Streamlit App Layout ---
 
 st.title("GETTR OSINT Tool")
@@ -161,11 +133,11 @@ if st.button("Search Posts", key="search_posts_btn"):
 
 # User Posts Section
 st.header("User Posts")
-user_for_posts = st.text_input("Enter username to get posts", key="user_posts")
-if st.button("Get User Activities", key="get_user_activities_btn"):
-    display_user_activity(user_for_posts, activity_type="posts", max_results=100)
-    display_user_activity(user_for_posts, activity_type="comments", max_results=100)
-    display_user_activity(user_for_posts, activity_type="likes", max_results=100)
+user_for_posts = st.text_input("Enter username to get posts")
+if st.button("Get User Activities"):
+    display_user_posts(user_for_posts)
+    display_user_comments(user_for_posts)
+    display_user_likes(user_for_posts) 
 
 # Sentiment Analysis Section
 st.header("Sentiment Analysis")
@@ -173,15 +145,15 @@ keyword_for_sentiment = st.text_input("Enter keyword or hashtag for sentiment", 
 if st.button("Analyze Sentiment", key="sentiment_btn"):
     display_posts_with_sentiment(keyword_for_sentiment)
 
-# Advanced Network Analysis
-st.header("Advanced Network Analysis")
-user_for_network = st.text_input("Enter username to visualize network (Advanced)", key="network_user")
-if st.button("Visualize Network (Interactive)", key="visualize_network_btn"):
-    visualize_network_interactively(user_for_network)
+st.header("User Network")
+user_for_network = st.text_input("Enter username to analyze network")
 
-# Trend Analysis
-st.header("Trend Analysis")
-keyword_for_trend = st.text_input("Enter keyword or hashtag for trend analysis", key="keyword_trend")
-if st.button("Perform Topic Modeling", key="topic_modeling_btn"):
-    perform_topic_modeling(keyword_for_trend)
+if st.button("Get Followers"):
+    followers_df = get_user_followers(user_for_network)
+    st.dataframe(followers_df)
+
+if st.button("Get Following"):
+    following_df = get_user_following(user_for_network)
+    st.dataframe(following_df)
+
     
