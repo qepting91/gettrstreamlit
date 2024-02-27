@@ -27,6 +27,8 @@ def display_user_info(username):
             st.error("User not found.")
     except errors.GettrApiError as e:
         st.error(f"Failed to fetch user info: {str(e)}")
+    except requests.exceptions.JSONDecodeError as e:
+        st.error("Failed to decode the response from the GETTR API. Please try again later.")
 
 def display_posts_by_keyword(keyword, max_results=100):
     try:
