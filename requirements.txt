@@ -1,3 +1,10 @@
 streamlit
-gogettr
 pandas
+gogettr
+networkx
+matplotlib
+textblob
+vaderSentiment
+scikit-learn
+bokeh
+nltk
