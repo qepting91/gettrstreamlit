@@ -42,16 +42,19 @@ def display_posts_by_keyword(keyword, max_results=100):
     except Exception as e:
         st.error(f"Error fetching posts by keyword: {str(e)}")
 
-def display_user_posts(username, max_results=100):
+def display_user_activity(username, activity_type="posts", max_results=100):
     try:
-        posts = list(client.user_activity(username=username, type="posts", max=max_results))
-        if posts:
-            df = pd.DataFrame(posts)
-            st.dataframe(df)
+        if activity_type in ["posts", "comments", "likes"]:
+            activities = list(client.user_activity(username=username, max=max_results, type=activity_type))
+            if activities:
+                df = pd.DataFrame(activities)
+                st.dataframe(df)
+            else:
+                st.error(f"No {activity_type} found for this user.")
         else:
-            st.error("No posts found for this user.")
+            st.error("Invalid activity type specified.")
     except errors.GettrApiError as e:
-        st.error(f"Failed to fetch user posts: {str(e)}")
+        st.error(f"Failed to fetch user {activity_type}: {str(e)}")
 
 def visualize_user_network(username):
     try:
@@ -88,28 +91,6 @@ def display_posts_with_sentiment(keyword, max_results=100):
             st.error("No posts found.")
     except Exception as e:
         st.error(f"Failed to analyze sentiment: {str(e)}")
-        
-def display_posts_with_location(keyword, max_results=100):
-    try:
-        posts = list(client.search(query=keyword, max=max_results))
-        if not posts:
-            st.error("No posts found.")
-            return
-
-        # Assuming posts have a 'location' field or similar
-        # This part of the implementation is highly dependent on the actual structure of the data returned by the API
-        locations = [post.get('location', 'Unknown location') for post in posts]
-        df = pd.DataFrame(posts)
-        df['location'] = locations
-        
-        # Display the DataFrame
-        st.dataframe(df)
-        
-        # Optional: If you have coordinates, you could also display these posts on a map
-        # For simplicity, this step is omitted but could involve using st.map or PyDeck for visualizations
-        
-    except Exception as e:
-        st.error(f"Failed to display posts with location: {str(e)}")
 
 
 def visualize_network_interactively(username):
@@ -181,8 +162,10 @@ if st.button("Search Posts", key="search_posts_btn"):
 # User Posts Section
 st.header("User Posts")
 user_for_posts = st.text_input("Enter username to get posts", key="user_posts")
-if st.button("Get User Posts", key="get_user_posts_btn"):
-    display_user_posts(user_for_posts, max_results)
+if st.button("Get User Activities", key="get_user_activities_btn"):
+    display_user_activity(user_for_posts, activity_type="posts", max_results=100)
+    display_user_activity(user_for_posts, activity_type="comments", max_results=100)
+    display_user_activity(user_for_posts, activity_type="likes", max_results=100)
 
 # Sentiment Analysis Section
 st.header("Sentiment Analysis")
@@ -202,8 +185,3 @@ keyword_for_trend = st.text_input("Enter keyword or hashtag for trend analysis",
 if st.button("Perform Topic Modeling", key="topic_modeling_btn"):
     perform_topic_modeling(keyword_for_trend)
     
-# Geospatial Analysis (Example)
-st.header("Geospatial Analysis")
-keyword_for_location = st.text_input("Enter keyword or hashtag for location analysis", key="keyword_location")
-if st.button("Analyze Posts with Location", key="location_analysis"):
-    display_posts_with_location(keyword_for_location)
