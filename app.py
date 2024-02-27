@@ -12,6 +12,7 @@ from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.plotting import figure, show
 from bokeh.transform import linear_cmap
 from bokeh.palettes import Spectral4
+from requests.exceptions import JSONDecodeError
 
 # Initialize the gogettr client
 client = PublicClient()
